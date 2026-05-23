@@ -57,13 +57,13 @@ const io = new Server(server, {
   },
 });
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // Initialize Supabase Client if credentials are provided
-const supabase = SUPABASE_URL && SUPABASE_ANON_KEY 
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
@@ -254,7 +254,7 @@ app.get('/api/stadium', (req, res) => {
 
 app.post('/api/emergency', authenticateJWT, requireRole(['admin', 'operator']), async (req, res) => {
   const { active, triggeredBy, duration } = req.body;
-  
+
   // RBAC check: only admin can activate evacuation, operator can only deactivate or trigger with confirmation
   const user = (req as AuthenticatedRequest).user;
   if (active && user?.role === 'operator') {
@@ -309,7 +309,7 @@ app.post('/api/emergency', authenticateJWT, requireRole(['admin', 'operator']), 
 app.post('/api/incident', authenticateJWT, requireRole(['admin', 'operator']), async (req, res) => {
   const { title, description, severity, zoneId, locationDetails } = req.body;
   const user = (req as AuthenticatedRequest).user;
-  
+
   const newIncident = {
     id: `inc-${Date.now()}`,
     title,
@@ -340,7 +340,7 @@ app.post('/api/incident', authenticateJWT, requireRole(['admin', 'operator']), a
 
 app.post('/api/gate/status', authenticateJWT, requireRole(['admin', 'operator']), async (req, res) => {
   const { gateId, status } = req.body;
-  
+
   if (!['open', 'closed', 'restricted'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status value' });
   }
@@ -371,7 +371,7 @@ Analyze the following telemetry data and create a concise operational briefing:
 4. Keep the output extremely concise and action-oriented (maximum 3 bullet points, under 100 words total).`;
 
   const inputTelemetryData = {
-    stadiumOccupancy: zones.map(z => ({ name: z.name, occupancy: z.current_occupancy, capacity: z.capacity, rate: (z.current_occupancy/z.capacity * 100).toFixed(1) + '%' })),
+    stadiumOccupancy: zones.map(z => ({ name: z.name, occupancy: z.current_occupancy, capacity: z.capacity, rate: (z.current_occupancy / z.capacity * 100).toFixed(1) + '%' })),
     gateStatus: gates.map(g => ({ name: g.name, status: g.status, waitTime: g.wait_time + 'm', flowRate: g.flow_rate + 'p/m' })),
     incidents: incidents.filter(i => i.status !== 'resolved'),
     alerts: alerts.filter(a => a.is_active),
@@ -468,7 +468,7 @@ app.post('/api/ai/voice', authenticateJWT, requireRole(['admin', 'operator']), a
   const { command } = req.body;
   const cmdLower = command.toLowerCase();
   let actionTaken = 'No structural action required.';
-  
+
   if (cmdLower.includes('emergency') || cmdLower.includes('evacuate') || cmdLower.includes('evacuation')) {
     if (cmdLower.includes('stop') || cmdLower.includes('disarm') || cmdLower.includes('cancel') || cmdLower.includes('disable')) {
       evacuationState = {
@@ -501,17 +501,17 @@ app.post('/api/ai/voice', authenticateJWT, requireRole(['admin', 'operator']), a
     let status: 'open' | 'closed' | 'restricted' = 'open';
     if (cmdLower.includes('close') || cmdLower.includes('lock')) status = 'closed';
     else if (cmdLower.includes('restrict')) status = 'restricted';
-    
+
     let targetGateId = '';
     if (cmdLower.includes('gate a') || cmdLower.includes('gate_a') || cmdLower.includes('stand a')) targetGateId = 'gate_a';
     else if (cmdLower.includes('gate b') || cmdLower.includes('gate_b') || cmdLower.includes('stand b')) targetGateId = 'gate_b';
     else if (cmdLower.includes('gate c') || cmdLower.includes('gate_c') || cmdLower.includes('stand c')) targetGateId = 'gate_c';
     else if (cmdLower.includes('gate d') || cmdLower.includes('gate_d') || cmdLower.includes('stand d')) targetGateId = 'gate_d';
-    
+
     if (targetGateId) {
       gates = gates.map(g => g.id === targetGateId ? { ...g, status } : g);
       actionTaken = `Gate ${targetGateId.replace('gate_', '').toUpperCase()} status updated to ${status.toUpperCase()}.`;
-      
+
       if (supabase) {
         try {
           await supabase.from('gates').update({ status, updated_at: new Date().toISOString() }).eq('id', targetGateId);
@@ -538,7 +538,7 @@ app.post('/api/ai/voice', authenticateJWT, requireRole(['admin', 'operator']), a
     };
     incidents.unshift(newIncident);
     actionTaken = `Incident logged and dispatched to security: "${command}"`;
-    
+
     if (supabase) {
       try {
         await supabase.from('incidents').insert({
@@ -562,7 +562,7 @@ Action executed: ${actionTaken}
 Provide a crisp, formal, military-style verbal response confirming command execution. Under 40 words.`;
 
   if (!GEMINI_API_KEY) {
-    return res.json({ 
+    return res.json({
       reply: `Command Acknowledged. Executing operation: ${actionTaken}`,
       actionTaken
     });
@@ -602,7 +602,7 @@ app.post('/api/ticket/scan', (req, res) => {
       created_at: new Date().toISOString()
     };
     alerts.unshift(newAlert);
-    
+
     const newIncident = {
       id: `inc-${Date.now()}`,
       title: 'Ticket Fraud Detected',
@@ -623,7 +623,7 @@ app.post('/api/ticket/scan', (req, res) => {
   // Success scan
   gate.current_throughput += 1;
   gate.wait_time = Math.max(1, Math.min(60, gate.wait_time + (Math.random() > 0.6 ? 1 : -1)));
-  
+
   let targetZoneId = 'zone_a';
   if (gateId === 'gate_b') targetZoneId = 'zone_b';
   else if (gateId === 'gate_c') targetZoneId = 'zone_c';
@@ -700,7 +700,7 @@ app.get('/api/analytics', (req, res) => {
 // Socket.io event handling
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
-  
+
   socket.emit('telemetry_update', { zones, gates, evacuationState });
   socket.emit('initial_state', { zones, gates, incidents, alerts, evacuationState });
 
