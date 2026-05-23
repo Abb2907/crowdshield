@@ -41,7 +41,11 @@ const MODE_CONFIG: Record<OperationalMode, { label: string; badge: string; cssCl
   night:      { label: 'NIGHT OPS',    badge: 'mode-night',     cssClass: '',              accent: '#8B5CF6' },
 };
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (
+  typeof window !== 'undefined'
+    ? (window.location.port === '5173' ? 'http://localhost:4000' : window.location.origin)
+    : 'http://localhost:4000'
+);
 
 export default function App() {
   const {

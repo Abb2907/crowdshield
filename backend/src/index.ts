@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -694,6 +695,22 @@ app.get('/api/analytics', (req, res) => {
     occupancyHistory,
     gateMetrics,
     incidentBreakdown
+  });
+});
+
+// Serve static assets from apps/web/dist if it exists
+const frontendDistPath = path.join(__dirname, '../../apps/web/dist');
+app.use(express.static(frontendDistPath));
+
+// Fallback all non-API routes to index.html for SPA routing
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    return next();
+  }
+  res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('CrowdShield AI Portal is compiling/loading or frontend assets are missing.');
+    }
   });
 });
 

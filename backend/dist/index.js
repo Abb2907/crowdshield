@@ -11,6 +11,7 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const supabase_js_1 = require("@supabase/supabase-js");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const path_1 = __importDefault(require("path"));
 // Load environment variables
 dotenv_1.default.config();
 const JWT_SECRET = process.env.JWT_SECRET || 'crowdshield-super-secret-key-987654321';
@@ -51,7 +52,7 @@ const io = new socket_io_1.Server(exports.server, {
         methods: ['GET', 'POST'],
     },
 });
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
@@ -67,16 +68,16 @@ else {
 }
 // In-memory fallback state
 let zones = [
-    { id: 'zone_a', name: 'Zone A - North Stand', capacity: 15000, current_occupancy: 7500, risk_level: 'safe' },
-    { id: 'zone_b', name: 'Zone B - East Stand', capacity: 12000, current_occupancy: 9600, risk_level: 'warning' },
-    { id: 'zone_c', name: 'Zone C - South Stand (Club)', capacity: 18000, current_occupancy: 16380, risk_level: 'critical' },
-    { id: 'zone_d', name: 'Zone D - West Stand', capacity: 15000, current_occupancy: 6000, risk_level: 'safe' },
+    { id: 'zone_a', name: 'Zone A - North Stand', capacity: 23000, current_occupancy: 11500, risk_level: 'safe' },
+    { id: 'zone_b', name: 'Zone B - East Stand', capacity: 20000, current_occupancy: 16000, risk_level: 'warning' },
+    { id: 'zone_c', name: 'Zone C - South Stand (Club)', capacity: 28000, current_occupancy: 25480, risk_level: 'critical' },
+    { id: 'zone_d', name: 'Zone D - West Stand', capacity: 24000, current_occupancy: 9600, risk_level: 'safe' },
 ];
 let gates = [
-    { id: 'gate_a', name: 'Gate A - North Plaza', status: 'open', wait_time: 5, flow_rate: 80, capacity: 15000, current_throughput: 4800 },
-    { id: 'gate_b', name: 'Gate B - East Access', status: 'open', wait_time: 12, flow_rate: 110, capacity: 12000, current_throughput: 7920 },
-    { id: 'gate_c', name: 'Gate C - South Main (Club)', status: 'restricted', wait_time: 28, flow_rate: 45, capacity: 18000, current_throughput: 16200 },
-    { id: 'gate_d', name: 'Gate D - West Entrance', status: 'open', wait_time: 3, flow_rate: 95, capacity: 15000, current_throughput: 5700 },
+    { id: 'gate_a', name: 'Gate A - North Plaza', status: 'open', wait_time: 5, flow_rate: 80, capacity: 23000, current_throughput: 9200 },
+    { id: 'gate_b', name: 'Gate B - East Access', status: 'open', wait_time: 12, flow_rate: 110, capacity: 20000, current_throughput: 13200 },
+    { id: 'gate_c', name: 'Gate C - South Main (Club)', status: 'restricted', wait_time: 28, flow_rate: 45, capacity: 28000, current_throughput: 25200 },
+    { id: 'gate_d', name: 'Gate D - West Entrance', status: 'open', wait_time: 3, flow_rate: 95, capacity: 24000, current_throughput: 9120 },
 ];
 let incidents = [
     {
@@ -644,6 +645,20 @@ exports.app.get('/api/analytics', (req, res) => {
         occupancyHistory,
         gateMetrics,
         incidentBreakdown
+    });
+});
+// Serve static assets from apps/web/dist if it exists
+const frontendDistPath = path_1.default.join(__dirname, '../../apps/web/dist');
+exports.app.use(express_1.default.static(frontendDistPath));
+// Fallback all non-API routes to index.html for SPA routing
+exports.app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+        return next();
+    }
+    res.sendFile(path_1.default.join(frontendDistPath, 'index.html'), (err) => {
+        if (err) {
+            res.status(404).send('CrowdShield AI Portal is compiling/loading or frontend assets are missing.');
+        }
     });
 });
 // Socket.io event handling

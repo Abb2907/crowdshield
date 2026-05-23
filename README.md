@@ -1,242 +1,141 @@
-# CrowdShield AI – Smart Stadium Operating System
+# CrowdShield AI — Smart Stadium Operating System & Crowd Intelligence Platform
 
 ## Overview
+**CrowdShield AI** is an enterprise-grade, real-time stadium operations and crowd intelligence system tailored for high-capacity venue management (e.g., a 95k+ capacity IPL cricket match at Chinnaswamy Stadium, featuring RCB vs CSK).
 
-**CrowdShield AI** is a real‑time, AI‑powered stadium management platform that simulates a high‑capacity cricket match (e.g., an IPL showdown at Chinnaswamy Stadium). It provides:
-- Live telemetry for zones, gates, and incidents.
-- AI‑generated briefings that adapt to the current stadium state.
-- Audio‑rich feedback (ambient hum, alerts, evacuation sirens, speech synthesis).
-- Ticket‑scan simulation and spectator chatbot for an immersive fan‑assistant experience.
+The platform uses live telemetry, dynamic AI-driven spectator routing, automated emergency orchestration, and comprehensive analytics to mitigate bottlenecks, counter ticket fraud, and streamline stadium egress and ingress.
 
-The system is organized as a **monorepo** with three primary workspaces:
-1. `backend` – a TypeScript/Node.js server handling the simulation logic, Supabase integration, and Socket.IO broadcasting.
-2. `apps/web` – a React + Vite SPA that visualises the stadium map, gate statuses, analytics, and interfaces with the audio engine.
-3. `packages/*` – shared utilities (currently empty, ready for future extensions).
+The project is structured as a **npm workspace monorepo**:
+1. **`backend/`** – A Node.js + TypeScript server utilizing Express, Socket.IO, and the Supabase JS Client to manage real-time simulation, incident workflows, and AI support.
+2. **`apps/web/`** – A React + Vite SPA using Zustand, Tailwind CSS, and Framer Motion to visualize stadium state, gate throughput, and analytics.
 
 ---
 
-## Architecture
+## System Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Backend
-        B1[src/index.ts] --> B2[Supabase Client]
-        B1 --> B3[Socket.IO Server]
-        B1 --> B4[Simulation Engine]
+flowchart TD
+    %% Clients/Users
+    User([Security Operator / Fan]) <--> |HTTP / WebSockets| Front[React SPA: apps/web]
+    
+    %% Front‑end structure
+    subgraph FrontEnd [React + Vite SPA]
+        Front --> |State Management| Store[Zustand Store: store.ts]
+        Store --> |Real-time Telemetry| SockClient[Socket.io Client]
+        Store --> |API Requests| FetchClient[Fetch API Client]
+        Front --> |Synthesized Announcements| Audio[Web Audio + Speech Synthesis]
     end
-    subgraph Frontend
-        F1[src/App.tsx] --> F2[Socket.IO Client]
-        F1 --> F3[AudioEngine (audio.ts)]
-        F1 --> F4[UI Components]
+    
+    %% Network Boundary
+    SockClient <--> |WebSocket Protocol| SockServer[Socket.io Server]
+    FetchClient <--> |HTTPS REST API| Express[Express App]
+    
+    %% Back‑end structure
+    subgraph BackEnd [Node.js + TS Server]
+        SockServer --- Express
+        Express --> |Telemetry Simulation| Engine[Telemetry & Evacuation Engine]
+        Express --> |Auth / JWT Middleware| Auth[RBAC Auth Middleware]
+        Engine --> |Gemini API Client| Gemini[Google Gemini AI Service]
+        Engine --> |DB Clients| SupaClient[Supabase JS Client]
     end
-    subgraph Database
-        DB[(Supabase Postgres)]
+    
+    %% Data Persistence
+    subgraph DataPersistence [Supabase Cloud Database]
+        SupaClient <--> |PostgreSQL Connection| DB[(PostgreSQL Database)]
     end
-    B2 --> DB
-    B4 --> DB
-    B3 --> F2
-    F2 --> F1
-    F3 --> F1
+    
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff;
+    classDef backend fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
+    classDef db fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff;
+    classDef ext fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff;
+    
+    class Front,Store,SockClient,FetchClient,Audio frontend;
+    class SockServer,Express,Engine,Auth,SupaClient backend;
+    class DB db;
+    class Gemini ext;
 ```
 
-### Backend
-- **Tech stack**: Node.js, TypeScript, Socket.IO, Supabase client (`@supabase/supabase-js`).
-- **Core responsibilities**:
-  - Initialise Supabase and seed stadium data.
-  - Maintain in‑memory state for zones, gates, incidents, and AI briefings.
-  - Broadcast updates via Socket.IO.
-  - Expose REST endpoints (e.g., `/auth/token`).
-- **Database**: Supabase Postgres with tables for `stadium_zones`, `gates`, `incidents`, `alerts`. The seed migration populates a ~95 k‑seat capacity.
+### Module Breakdown
 
-### Front‑end (Web App)
-- **Tech stack**: React 18, TypeScript, Vite, Zustand, Socket.IO client, Framer Motion, Recharts.
-- **Key modules**:
-  - `App.tsx` – orchestrates UI panels, connects to the socket, and syncs with the audio engine.
-  - `audio.ts` – `StadiumAudioEngine` delivers ambient sound, chimes, alerts, and evacuation siren; uses Web Speech API for AI briefings.
-  - `scanner` – ticket‑scan view that validates gate IDs.
-- **Audio controls**: Mute toggle persists across sessions; chime on un‑mute, alerts on incidents, siren on evacuation.
-- **AI Briefings**: Short spoken summaries generated on the backend and spoken via `speechSynthesis`.
+#### Backend Server (`backend/src/index.ts`)
+- **Real-Time Simulation**: Runs a telemetry engine updating occupant density, gate flow rates, and incident states every 2 seconds.
+- **WebSocket Streaming**: Dispatches live updates (`telemetry_update`, `alert_broadcast`) to connected operators.
+- **Security & RBAC**: Implements JWT authentication and Role-Based Access Control (`viewer`, `operator`, `admin`) to restrict critical functions like triggering evacuation sirens.
+- **Static Hosting**: Configured to build and serve the React frontend assets dynamically, enabling single-container deployments on Cloud Run.
+
+#### Frontend Dashboard (`apps/web/`)
+- **Digital Twin map**: Renders a dynamic vector map of the cricket stands (Zones A-D) with color-coded congestion levels.
+- **Sound Design & Chimes**: Integrates ambient crowd noise, gate scanning audio chimes, incident alerts, and evacuation sirens.
+- **Voice Overrides**: Allows operator voice commands (via Speech Recognition) to trigger gate changes or emergencies.
+- **Ticket Scanner**: Simulates barcode scanning to stress-test throughput and catch duplicate/counterfeit tickets.
 
 ---
 
-## Getting Started
+## Installation & Setup
 
 ### Prerequisites
-- Node.js (v18+)
-- npm (bundled with Node)
-- Supabase CLI (optional – migrations are applied automatically on start)
-- Git (optional for version control)
+- **Node.js** (v18 or higher)
+- **npm** (v9 or higher)
 
-### Installation
+### Setup Steps
+
+1. **Clone the repository** and navigate to the project directory:
+   ```bash
+   git clone https://github.com/Abb2907/crowdshield.git
+   cd apl_finale_project
+   ```
+
+2. **Install all monorepo dependencies**:
+   ```bash
+   npm run install:all
+   ```
+
+3. **Configure Environment Variables** (create a `.env` file in the `backend/` directory):
+   ```env
+   PORT=8080
+   JWT_SECRET=your-secure-jwt-secret
+   SUPABASE_URL=https://your-supabase-project.supabase.co
+   SUPABASE_ANON_KEY=your-supabase-anon-key
+   GEMINI_API_KEY=your-google-gemini-api-key
+   ```
+   *Note: If Supabase or Gemini variables are missing, the server will degrade gracefully to mock data and static briefings.*
+
+---
+
+## Running the Application
+
+### Local Development Mode
+Start backend and web dev servers concurrently in separate terminals:
 ```bash
-# Clone the repository (if you haven’t already)
-git clone https://github.com/Abb2907/crowdshield.git
-cd apl_finale_project
-
-# Install workspace dependencies
-npm run install:all
-```
-
-### Running the Stack
-```bash
-# Terminal 1 – Backend (http://localhost:4000)
+# Terminal 1: Start Backend (Default: http://localhost:4000)
 npm run dev:backend
 
-# Terminal 2 – Front‑end (Vite dev server on http://localhost:5173)
+# Terminal 2: Start Vite Frontend (Default: http://localhost:5173)
 npm run dev:web
 ```
-The backend seeds Supabase with the stadium layout. The front‑end connects via Socket.IO and displays the live map, gate statuses, and analytics.
 
----
-
-## Project Structure
-| Folder | Purpose |
-|--------|---------|
-| `backend/` | Server‑side logic, Supabase integration, socket handling. |
-| `apps/web/` | React SPA – the command‑center UI. |
-| `supabase/migrations/` | Database schema & seed data (zones, gates, incidents). |
-| `packages/` | Placeholder for shared libraries (e.g., utilities, types). |
-
----
-
-## Contributing
-1. Fork the repository.
-2. Create a feature branch:
-   ```bash
-   git checkout -b feature/<description>
-   ```
-3. Make changes, run the dev servers, and test locally.
-4. Submit a Pull Request – ensure lint passes (`npm run lint`).
-
----
-
-## License
-This project is licensed under the **MIT License**.
-
----
-
-## Contact
-For questions or demo requests, open an issue or reach out to the repository maintainer.
-
-
-## Overview
-
-**CrowdShield AI** is a real‑time, AI‑powered stadium management platform that simulates a high‑capacity cricket match (e.g., an IPL showdown at Chinnaswamy Stadium).  It provides:
-- **Live telemetry** for zones, gates, and incidents.
-- **AI‑generated briefings** that adapt to the current stadium state.
-- **Audio‑rich feedback** (ambient hum, alerts, evacuation sirens, speech synthesis).
-- **Ticket‑scan simulation** and **spectator chatbot** for a fully immersive fan‑assistant experience.
-
-The system is built as a **monorepo** with three primary workspaces:
-1. **`backend`** – a TypeScript/Node.js server that hosts the WebSocket API, connects to Supabase, and drives the simulation logic.
-2. **`apps/web`** – a React+Vite SPA that renders the command‑center UI, visualises the stadium map, gates, and analytics, and interacts with the backend via Socket.IO.
-3. **`packages/*`** – shared utilities (currently empty but ready for future extensions).
-
-> **Why 90 k+ capacity?**  The in‑memory fallback data has been updated to reflect a 95 000‑seat stadium (23k + 20k + 28k + 24k) to mimic a blockbuster IPL match and stress‑test the evacuation flow.
-
----
-
-## Architecture
-
-```
-crowdcommand-workspace/
-├─ backend/                # Node.js + TypeScript server
-│   ├─ src/index.ts        # Core simulation, Socket.IO, Supabase sync
-│   ├─ src/test_auth.ts   # Simple auth test (JWT stub)
-│   └─ supabase/          # Supabase migration & seed data
-│       └─ migrations/20260523000000_init_schema.sql
-│
-├─ apps/web/               # Vite + React front‑end
-│   ├─ src/App.tsx         # Main UI, hooks into audioEngine & socket
-│   ├─ src/audio.ts        # AudioEngine (ambient, chime, alert, siren)
-│   └─ public/ …
-│
-├─ packages/               # Shared libraries (future)
-│
-├─ package.json            # Workspace definitions & scripts
-└─ README.md               # **You are here** – project documentation
-```
-
-### Backend
-- **Tech stack**: Node.js, TypeScript, Socket.IO, Supabase client (`@supabase/supabase-js`).
-- **Entry point**: `src/index.ts`.
-- **Core responsibilities**:
-  - Initialise Supabase, fetch/seed stadium data.
-  - Maintain in‑memory state for zones, gates, incidents, and AI briefings.
-  - Broadcast updates to all connected clients via Socket.IO.
-  - Provide REST endpoints (e.g., `/auth/token`) for the front‑end.
-- **Database**: Supabase Postgres with tables for `stadium_zones`, `gates`, `incidents`, `alerts`. The seed migration populates the **90 k+** capacities.
-
-### Front‑end (Web App)
-- **Tech stack**: React 18, TypeScript, Vite, Zustand for state management, Socket.IO client, Framer Motion for UI animations, Recharts for analytics.
-- **Key modules**:
-  - `App.tsx` – orchestrates UI panels (map, gates, analytics), connects to the socket, and syncs with the audio engine.
-  - `audio.ts` – `StadiumAudioEngine` delivers ambient sound, chimes, alerts, and an evacuation siren; also uses Web Speech API for AI briefings.
-  - `scanner` – a ticket‑scan view that validates gate IDs (real/fake) and shows the result.
-- **Audio controls**: Mute toggle (`audioMuted` state) persists across sessions; chime plays on un‑mute, alerts on new incidents, siren on evacuation.
-- **AI Briefings**: Short spoken summaries are generated on the backend and spoken via `speechSynthesis`.
-
----
-
-## Getting Started
-
-### Prerequisites
-- **Node.js** (v18+ recommended)
-- **npm** (comes with Node)
-- **Supabase CLI** (optional – the migrations are already applied when the backend starts)
-- **Git** (optional, for version control)
-
-### Installation
+### Production Build & Launch
+Build the React frontend assets, compile TypeScript, and boot the Express production server:
 ```bash
-# Clone the repo (if you haven’t already)
-git clone <repo‑url>
-cd apl_finale_project
+# Compile and package everything
+npm run build
 
-# Install all workspace dependencies
-npm run install:all
+# Start the Node.js server
+npm start
 ```
+The server will start listening on your defined `PORT` (or default `8080`) and serve the React dashboard at the root URL (`/`).
 
-### Running the stack
+---
+
+## Cloud Run Deployment
+
+To deploy this monorepo to **Google Cloud Run**, ensure your code is pushed to your Git repository, then run:
 ```bash
-# Terminal 1 – Backend (listens on http://localhost:4000)
-npm run dev:backend
-
-# Terminal 2 – Front‑end (Vite dev server on http://localhost:5173)
-npm run dev:web
+gcloud run deploy crowdshield \
+  --source . \
+  --platform managed \
+  --allow-unauthenticated \
+  --set-env-vars="SUPABASE_URL=...,SUPABASE_ANON_KEY=...,GEMINI_API_KEY=..."
 ```
-The backend will automatically seed Supabase with the stadium layout.  The front‑end connects via Socket.IO and displays the live map, gate statuses, and analytics.
-
-### Development notes
-- **Hot‑reload**: `nodemon` watches all TypeScript files in `backend/src`.  Any change triggers a restart.
-- **Live‑replay**: The UI contains a “Replay” mode that steps through historic state snapshots – great for demos.
-- **Audio**: Interact with the mute button on the top‑right; un‑muting plays a pleasant chime.
-- **Evacuation**: Clicking the “Evacuate” button activates the siren and an audio announcement.
-
----
-
-## Project Structure Highlights
-| Folder | Purpose |
-|--------|---------|
-| `backend/` | Server‑side logic, Supabase integration, socket handling. |
-| `apps/web/` | React SPA – the command‑center UI. |
-| `supabase/migrations/` | Database schema & seed data (zones, gates, incidents). |
-| `packages/` | Placeholder for shared libraries (e.g., utilities, types). |
-
----
-
-## Contributing
-1. **Fork** the repository.
-2. Create a **feature branch**:
-   ```bash
-   git checkout -b feature/<description>
-   ```
-3. Make your changes, run the dev servers, and test locally.
-4. Submit a **Pull Request** – ensure lint passes (`npm run lint`).
-
-## License
-This project is licensed under the **MIT License**.
-
----
-
-### Contact
-For questions or demo requests, open an issue or reach out to the repository maintainer.
+The platform automatically uses the `Procfile` to run `npm run build && node backend/dist/index.js` to compile resources and spin up the production server.
