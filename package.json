@@ -10,6 +10,7 @@
   "scripts": {
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:backend": "npm run dev --workspace=backend",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "start": "npm run dev:backend"
   }
 }
